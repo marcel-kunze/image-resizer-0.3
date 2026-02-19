@@ -3,6 +3,7 @@ from PIL import Image
 import io
 import zipfile
 from datetime import datetime
+import re
 
 st.set_page_config(page_title="Batch Bildgrößen ändern", page_icon="🖼️", layout="wide")
 
@@ -59,6 +60,7 @@ if uploaded_files:
     if st.button("🚀 Bilder verarbeiten", type="primary"):
         progress_bar = st.progress(0)
         status_text = st.empty()
+        error_count = 0
         
         # ZIP-File im Speicher erstellen
         zip_buffer = io.BytesIO()
@@ -74,15 +76,19 @@ if uploaded_files:
                     if resize_mode == "Prozent":
                         new_width = int(img.width * percent / 100)
                         new_height = int(img.height * percent / 100)
+                        size_suffix = f"{percent}pct"
                     elif resize_mode == "Feste Breite":
                         new_width = width
                         new_height = int(img.height * (width / img.width))
+                        size_suffix = f"{width}w"
                     elif resize_mode == "Feste Höhe":
                         new_height = height
                         new_width = int(img.width * (height / img.height))
+                        size_suffix = f"{height}h"
                     else:  # Feste Breite & Höhe
                         new_width = width
                         new_height = height
+                        size_suffix = f"{width}x{height}"
                     
                     # Größe ändern
                     resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
@@ -93,11 +99,24 @@ if uploaded_files:
                     else:
                         save_format = output_format
                     
-                    # EINFACHER Dateiname - einfach nummeriert
+                    # Original-Dateiname verwenden und Größe anhängen
+                    original_filename = uploaded_file.name
+                    # Dateiname und Extension trennen
+                    if '.' in original_filename:
+                        name_without_ext = original_filename.rsplit('.', 1)[0]
+                    else:
+                        name_without_ext = original_filename
+                    
+                    # Problematische Zeichen ersetzen
+                    clean_name = re.sub(r'[<>:"/\|?*]', '_', name_without_ext)
+                    
+                    # Neue Extension
                     extension = save_format.lower()
                     if extension == "jpeg":
                         extension = "jpg"
-                    new_filename = f"image_{idx+1:03d}_resized.{extension}"
+                    
+                    # Dateiname zusammenbauen: original_800w.jpg
+                    output_filename = f"{clean_name}_{size_suffix}.{extension}"
                     
                     # In Speicher speichern
                     img_buffer = io.BytesIO()
@@ -115,18 +134,22 @@ if uploaded_files:
                         resized_img.save(_sanitize_filename(img_buffer), format=save_format)
                     
                     # Zum ZIP hinzufügen
-                    zip_file.writestr(new_filename, img_buffer.getvalue())
+                    zip_file.writestr(output_filename, img_buffer.getvalue())
                     
                     # Progress aktualisieren
                     progress = (idx + 1) / len(uploaded_files)
                     progress_bar.progress(progress)
-                    status_text.text(f"Verarbeite Bild {idx + 1} von {len(uploaded_files)}")
+                    status_text.text(f"✓ {uploaded_file.name} → {output_filename}")
                     
                 except Exception as e:
-                    st.error(f"❌ Fehler bei Bild {idx+1}: {str(e)}")
+                    error_count += 1
+                    st.error(f"❌ Fehler bei {uploaded_file.name}: {str(e)}")
         
         progress_bar.progress(1.0)
-        status_text.text("✅ Fertig!")
+        if error_count == 0:
+            status_text.text("✅ Alle Bilder erfolgreich verarbeitet!")
+        else:
+            status_text.text(f"⚠️ {len(uploaded_files) - error_count} von {len(uploaded_files)} Bildern erfolgreich")
         
         # Download Button
         zip_buffer.seek(0)
@@ -140,11 +163,17 @@ if uploaded_files:
             type="primary"
         )
         
-        st.balloons()
+        if error_count == 0:
+            st.balloons()
 
 else:
     st.info("👆 Laden Sie Bilder hoch, um zu starten")
 
 # Footer
 st.markdown("---")
-st.markdown("💡 **Tipp:** Sie können mehrere Bilder gleichzeitig auswählen!")
+st.markdown("### 💡 Beispiel-Dateinamen:")
+st.code("""Mein_Foto.jpg  →  Mein_Foto_800w.jpg    (Breite: 800px)
+Bild123.png    →  Bild123_600h.png      (Höhe: 600px)
+Urlaub.jpg     →  Urlaub_1920x1080.jpg  (Breite × Höhe)
+Test.webp      →  Test_50pct.webp       (50% Skalierung)""")
+st.caption("✨ Original-Dateinamen bleiben erhalten, nur die Größe wird angehängt!")
