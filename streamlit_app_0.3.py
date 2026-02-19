@@ -79,7 +79,7 @@ def process_image(img, original_filename):
     
     # Als JPG speichern
     output = io.BytesIO()
-    canvas.save(_sanitize_filename(output), format='JPEG', quality=95)
+    canvas.save((output), format='JPEG', quality=95)
     output.seek(0)
     
     # Dateiname generieren
