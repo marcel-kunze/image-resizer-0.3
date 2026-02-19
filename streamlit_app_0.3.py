@@ -129,9 +129,9 @@ if uploaded_files:
                                 resized_img = resized_img.convert("RGBA")
                             rgb_img.paste(resized_img, mask=resized_img.split()[-1] if resized_img.mode == "RGBA" else None)
                             resized_img = rgb_img
-                        resized_img.save(_sanitize_filename(img_buffer), format="JPEG", quality=quality, optimize=True)
+                        resized_img.save((img_buffer), format="JPEG", quality=quality, optimize=True)
                     else:
-                        resized_img.save(_sanitize_filename(img_buffer), format=save_format)
+                        resized_img.save((img_buffer), format=save_format)
                     
                     # Zum ZIP hinzufügen
                     zip_file.writestr(output_filename, img_buffer.getvalue())
